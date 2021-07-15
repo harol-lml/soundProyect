@@ -1,0 +1,385 @@
+<html>
+<head>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+<script src="https://canvasjs.com/assets/script/canvasjs.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body {font-family: Arial;}
+
+/* Style the tab */
+.tab {
+  overflow: hidden;
+  border: 1px solid #ccc;
+  background-color: #f1f1f1;
+}
+
+/* Style the buttons inside the tab */
+.tab button {
+  background-color: inherit;
+  float: left;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  padding: 14px 16px;
+  transition: 0.3s;
+  font-size: 17px;
+}
+
+/* Change background color of buttons on hover */
+.tab button:hover {
+  background-color: #ddd;
+}
+
+/* Create an active/current tablink class */
+.tab button.active {
+  background-color: #ccc;
+}
+
+/* Style the tab content */
+.tabcontent {
+  display: none;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-top: none;
+}
+</style>
+
+<script>
+
+$(document).ready(function(){
+	var intevalId=null;
+	var ses=0;
+	var centroides1;
+	var centroides2;
+	var xy;
+	
+	function sesion(){
+		ses=ses+1;
+		alert(ses);
+		}
+
+	var dps = []; // dataPoints
+	var xVal = 0;
+	var yVal = 100;
+	var updateInterval = 1000;
+	var dataLength = 20;
+	
+
+	var chart = new CanvasJS.Chart("chartContainer", {
+				title :{
+					text: "Escala de Ruido",
+					fontColor: "#C0504E"
+					//fontColor: "Peru"
+				},
+				axisY: {
+					includeZero: false,
+					title: "unidades en desibeles",
+					titleFontColor: "#F08080",
+					lineColor: "#F08080",
+					labelFontColor: "#F08080",
+					tickColor: "#F08080C",
+					suffix: "dB"
+				},axisX:[{
+					title: "Segundos",
+					suffix: "s"
+					}],
+				data: [{
+					type: /*"bubble",*/ /*"area",*/"splineArea",//"line",
+					titleFontColor: "#F08080",
+					color: "#F08080",
+					//markerType: "square",
+					lineDashType: "dash",
+					dataPoints: dps
+				}]
+			});
+
+    function generar(){
+		$.ajax({
+               type: "GET",
+               url: "/aleatorio",
+               data:{
+					"userSesion":ses
+					},
+               success: function(data) {
+                       var obj=jQuery.parseJSON(data);
+                       var cons="";
+                       if(parseInt(obj.cadena)==1){cons="Bajo";}
+                       if(parseInt(obj.cadena)==2){cons="Normal";}
+                       if(parseInt(obj.cadena)==3){cons="Considerable";}
+                       if(parseInt(obj.cadena)==4){cons="Alto";}
+                       if(parseInt(obj.cadena)==5){cons="Muy alto";}
+                       if(parseInt(obj.cadena)==6){cons="Umbral de dolor";}
+
+                       var resp="<table border='2'><tr><td>Sonido</td><td>"+obj.num+"dB</td></tr><tr><td>Consecuencia</td><td>"+cons+"</td></tr></table>";
+			        $("#num").html(resp);
+					actualizar(parseFloat(obj.num));
+
+    }
+});
+
+}
+    function actualizar (num) {
+				dps.push({
+						x: xVal,
+						y: num
+				});
+				xVal++;
+
+				if (dps.length > dataLength) {
+					dps.shift();
+				}
+
+				chart.render();
+			}
+					
+			
+	function cen1(val){
+
+		$.ajax({
+			type: "GET",
+			url: "/c1?busqueda="+val,
+			success: function(data){				
+				centroides1=data;
+				}
+				
+			});
+		};
+	
+	function cen2(val){
+
+		$.ajax({
+			type: "GET",
+			url: "/c2?busqueda="+val,
+			success: function(data){				
+				centroides2=data;
+				}
+				
+			});
+		};
+		
+	function valXY(val){
+		
+		$.ajax({
+			type: "GET",
+			url: "/valorxy?busqueda="+val,
+			success: function(data){				
+				xy=data;
+				}
+				
+			});
+		};
+			
+	$('#iniciar').click(function(){
+		$.ajax({
+			type: "GET",
+			url: "/sesion",
+			success: function(data){
+				ses=parseInt(data);
+				sesion();
+				intervalId = setInterval(generar,1000);					
+				}
+				
+			});
+		});
+		
+	$('#detener').click(function(){
+			clearInterval(intervalId);
+			
+		});
+		
+
+    $('#consultar').click(function(){
+	$.ajax({
+                type: "GET",
+                url: "/consultar",
+                success: function(data) {
+                        $("#datos").html(data);
+                }
+        });
+    });
+    $('#buscar').click(function(){
+	var num=document.getElementById("bus").value;
+	$.ajax({
+                type: "GET",
+                url: "/buscar?busqueda="+num,
+	success: function(data) {
+                        $("#datos").html(data);
+                }
+        });
+    });
+    //Se hallan los centroides a graficar
+    $('#centroide').click(function(){
+		var busqueda=document.getElementById("bus").value;
+		cen1(busqueda);
+		cen2(busqueda);
+		valXY(busqueda);		
+		$.ajax({
+			type: "GET",
+			url: "/centroide?busqueda="+busqueda,
+			success: function(data){
+				$("#datos").html(data);
+				}
+			});
+		});
+		// luego de haberse ejecutado la función anterior se grafica
+	$('#grafica').click(function(){
+		
+		var busqueda=document.getElementById("bus").value;
+		var dpsa = [];
+		var centr=[];
+		var c11;
+		var c12;
+		var c21;
+		var c22;
+		var x;
+		var y;
+		centroides1=centroides1.split(';')
+		centroides2=centroides2.split(';')
+		xy=xy.split(';')/*
+		console.log(centroides1);
+		console.log(centroides2);*/
+		c11=parseFloat(centroides1[0]);//Nivel de ruido  
+		c12=parseFloat(centroides1[1]);
+		c21=parseFloat(centroides2[0]);//Clasifcafion
+		c22=parseFloat(centroides2[1]);
+		vx=xy[0];
+		vy=xy[1];
+		vx=vx.split(',');
+		vy=vy.split(',');
+		console.log("c11: "+ c11);
+		console.log("c12: "+ c12);
+		console.log("c21: "+ c21);
+		console.log("c22: "+ c22);
+		
+		for(var i=0; i<vx.length; i++){
+			vx[i]=vx[i].trim();
+			vy[i]=vy[i].replace('\'','');
+			vy[i]=vy[i].replace('\'','')
+			dpsa.push({
+						x: parseFloat(vx[i]),
+						y: parseFloat(vy[i]),
+						name: ""
+				});
+			}
+			
+			
+			centr.push({
+						x: c21,
+						y: c11,
+						name: "Centroide"
+				});
+			centr.push({
+						x: c22,
+						y: c12,
+						name: "Centroide"
+				});
+				
+			console.log( dpsa);
+		
+
+		
+		var chart2 = new CanvasJS.Chart("chartContainer2", {
+			animationEnabled: true,
+			zoomEnabled: true,
+			title:{
+				text: "Centroides"
+				},
+			axisX: {
+				valueFormatString: "0.0#",
+				title:"Clasificacion"
+				},
+			axisY:{
+				valueFormatString: "0.0#",
+				title: "Nivel de ruido",
+				suffix: "dB"
+				},
+			data: [{
+				markerType: "triangle",
+				markerColor: "green",			
+				type: "scatter",				
+				toolTipContent: "<b>Nivel de Ruido: </b>{y} dB<br/><b>Clasificacion: </b>{x}",
+				dataPoints: dpsa	
+							
+					},{
+						
+						type: "scatter",
+						//markerSize: 15,
+						toolTipContent: "<b><strong>{name}</strong> <br/><b>Nivel de Ruido: </b>{x} dB<br/><b>Clasificacion: </b>{y}",
+						dataPoints: centr	
+						
+						}]
+			});
+			chart2.render();
+		
+			});
+});
+				
+			
+</script>
+</head>
+<body>
+	<center><h2><font size=6&gt;Este texto es más grande, size=6</font>{{tit}}</h2></center>
+	<!--<p>Num: <input type="text" id="numero"></p>
+	<br><br>
+	<center>
+
+	<br><br>
+	<!--
+	</center>-->
+<div class="tab">
+  <button class="tablinks" onclick="openCity(event, 'London')">Escaneo</button>
+  <button class="tablinks" onclick="openCity(event, 'Paris')">Datos</button>
+  <button class="tablinks" onclick="openCity(event, 'Tokyo')">     </button>
+</div>
+
+<div id="London" class="tabcontent">
+  <h3>Escaneo</h3>
+  
+  <br>
+	<div id="num"></div>
+	<br>
+	<div id="chartContainer" style="height: 200px; width: 100%;"></div>
+  	<center>
+  	<button id="iniciar">Iniciar monitorizacion</button>
+	<button id="detener">Detener monitorizacion</button>
+	</center>
+</div>
+
+<div id="Paris" class="tabcontent">
+  <h3>Datos</h3>
+  <!-- Aca se grafican los centroides-->
+  <div id="chartContainer2" style="height: 200px; width: 100%;"></div>
+  <center>
+  <p>Buscar sesion: <input type = "text" id="bus"></p>
+	<button id="buscar">Buscar</button>
+	<button id="centroide">Analisis</button>
+	<button id="grafica">Grafica</button>
+	<button id="consultar">Listar Todo</button>
+	<br><br>
+	<div id="datos"></div>
+	</center>
+</div>
+
+<div id="Tokyo" class="tabcontent">
+  <h3>Tokyo</h3>
+  <p>Tokyo is the capital of Japan.</p>
+  <center><button>Holas</button></center>
+</div>
+
+<script>
+function openCity(evt, cityName) {
+  var i, tabcontent, tablinks;
+  tabcontent = document.getElementsByClassName("tabcontent");
+  for (i = 0; i < tabcontent.length; i++) {
+    tabcontent[i].style.display = "none";
+  }
+  tablinks = document.getElementsByClassName("tablinks");
+  for (i = 0; i < tablinks.length; i++) {
+    tablinks[i].className = tablinks[i].className.replace(" active", "");
+  }
+  document.getElementById(cityName).style.display = "block";
+  evt.currentTarget.className += " active";
+}
+</script>
+</body>
+</html>
